@@ -1,0 +1,57 @@
+import pandas as pd
+
+# Sample movie ratings data
+data = {
+    'user': ['User1', 'User1', 'User1', 'User2', 'User2', 'User3', 'User3'],
+    'movie': ['Movie1', 'Movie2', 'Movie3', 'Movie1', 'Movie3', 'Movie2', 'Movie4'],
+    'rating': [5, 3, 4, 4, 5, 2, 4]
+}
+
+df = pd.DataFrame(data)
+
+# Create user-movie rating matrix (pivot table)
+rating_matrix = df.pivot_table(index='user', columns='movie', values='rating')
+
+print("\nUser-Movie Rating Matrix:")
+print(rating_matrix)
+
+# Fill NaN with 0 (or use mean/other strategy)
+rating_matrix_filled = rating_matrix.fillna(0)
+
+# Compute user similarity using Pearson correlation
+user_similarity = rating_matrix_filled.T.corr()
+
+print("\nUser Similarity Matrix:")
+print(user_similarity)
+
+# Function to get movie recommendations for a user
+def get_recommendations(target_user, rating_matrix, similarity_matrix, n=3):
+    similar_users = similarity_matrix[target_user].drop(target_user).sort_values(ascending=False)
+
+    # Movies the target user has not rated
+    unrated_movies = rating_matrix.loc[target_user][rating_matrix.loc[target_user].isnull()].index
+
+    # Predict ratings for unrated movies
+    recommendations = {}
+    for movie in unrated_movies:
+        total_sim = 0
+        weighted_ratings = 0
+        for other_user, sim_score in similar_users.items():
+            rating = rating_matrix.loc[other_user, movie]
+            if pd.notnull(rating):
+                weighted_ratings += sim_score * rating
+                total_sim += sim_score
+        if total_sim > 0:
+            predicted_rating = weighted_ratings / total_sim
+            recommendations[movie] = predicted_rating
+
+    # Sort and return top N recommendations
+    recommended_movies = sorted(recommendations.items(), key=lambda x: x[1], reverse=True)
+    return recommended_movies[:n]
+
+# Example: Get recommendations for User3
+recommendations = get_recommendations('User3', rating_matrix, user_similarity)
+
+print("\nTop Recommendations for User3:")
+for movie, score in recommendations:
+    print(f"{movie}: {score:.2f}")
